@@ -229,24 +229,19 @@ public class QueryMongoMapReduce
     	// TODO: Write a MongoDB MapReduce query that returns the total value of all orders.  i.e. SUM(orders.total)    	
     	// Note: Output key must be called: "totalOfAllOrders".
 		
-    	//String mapfn = "function() { "
-					//+"emit(\"totalOfAllOrders\", this.orders.total);}";
-		
-
 		String mapFunction = "function() {"
 			+"for (var idx = 0; idx < this.orders.length; idx++) {"
 			+"var key = \"totalOfAllOrders\";"
 			+"var value = this.orders[idx].total;"
 			+"emit(key, value);} };";
-		//String reducefn = "function(key, items) { "
-						//+" return items.length; }";	
+	
 		String reduceFunction = "function(keySKU, countObjVals) {"
 			+"reducedVal = 0;"
 			+"for (var idx = 0; idx < countObjVals.length; idx++) {"
 					+"reducedVal += countObjVals[idx];}"
 			+"return reducedVal;};";			
 		
-		System.out.println("\nTotal value of all orders:");
+		System.out.println("\nTotal value of all orders:" );
 		MongoCollection<Document> col = db.getCollection(COLLECTION_NAME);
 		MapReduceIterable<Document> output = col.mapReduce(mapFunction, reduceFunction);
 		return output.iterator();
@@ -261,10 +256,20 @@ public class QueryMongoMapReduce
     public MongoCursor<Document> query3()
     {
     	// TODO: Write a MongoDB MapReduce query that returns the total value of all orders per state.  SELECT state, SUM(orders.total) GROUP BY state 	
-    	String mapfn = "function () { "
-					+"emit(this.state, this.orders$total); }";
-		String reducefn = "function(key, items) { "
-						+" return items.length; }";					
+    	String mapfn = "function() {"
+			+"for (var idx = 0; idx < this.orders.length; idx++) {"
+			+"var key = this.state;"
+			+"var value = this.orders[idx].total;"
+				+"if (value == 0) {"
+				+"idx+=1;"
+				+"value = this.orders[idx].total; }"
+			+"emit(key, value);} };";
+	
+		String reducefn = "function(keySKU, countObjVals) {"
+			+"reducedVal = 0;"
+			+"for (var idx = 0; idx < countObjVals.length; idx++) {"
+					+"reducedVal += countObjVals[idx];}"
+			+"return reducedVal;};";					
 		
 		System.out.println("\nTotal value of all orders per state:");
 		MongoCollection<Document> col = db.getCollection(COLLECTION_NAME);
