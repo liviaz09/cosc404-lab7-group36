@@ -205,12 +205,18 @@ public class QueryMongoMapReduce
     	// See: https://docs.mongodb.org/manual/core/map-reduce/
     	// See: https://docs.mongodb.org/manual/tutorial/map-reduce-examples/
     	// See: https://mongodb.github.io/mongo-java-driver/4.4/apidocs/mongodb-driver-legacy/com/mongodb/DBCollection.html#mapReduce(java.lang.String,java.lang.String,java.lang.String,com.mongodb.DBObject)
-    	    	
+    	
+		String mapfn = "function () {"
+					+"emit(this.state, this._id); }"; 
+		String reducefn = "function(key, items) { "
+						+ "return items.length; }";
+		
+		System.out.print("\nNumber of documents (customers):");
 		MongoCollection<Document> col = db.getCollection(COLLECTION_NAME);
 		
-		// MapReduceIterable<Document> output = col.mapReduce(mapfn, reducefn);
-		// return output.iterator();
-		return null;
+		MapReduceIterable<Document> output = col.mapReduce(mapfn, reducefn);
+		return output.iterator();
+		//return null;
     }
        
    
@@ -222,10 +228,19 @@ public class QueryMongoMapReduce
     {
     	// TODO: Write a MongoDB MapReduce query that returns the total value of all orders.  i.e. SUM(orders.total)    	
     	// Note: Output key must be called: "totalOfAllOrders".
-    	
-		MongoCollection<Document> col = db.getCollection(COLLECTION_NAME);
 		
-		return null;
+    	String mapfn = "function() { "
+					+"emit(\"totalOfAllOrders\", this.orders$total);}";
+		String reducefn = "function(key, items) { "
+						+" return Array.sum(items); }";					
+		
+		System.out.println("\nNumber of array elements (# of orders):");
+		MongoCollection<Document> col = db.getCollection(COLLECTION_NAME);
+		MapReduceIterable<Document> output = col.mapReduce(mapfn, reducefn);
+		return output.iterator();
+
+		
+		//return null;
     }
     
     /**
