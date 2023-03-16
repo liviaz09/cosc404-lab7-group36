@@ -229,13 +229,13 @@ public class QueryMongoMapReduce
     	// TODO: Write a MongoDB MapReduce query that returns the total value of all orders.  i.e. SUM(orders.total)    	
     	// Note: Output key must be called: "totalOfAllOrders".
 		
-		String mapFunction = "function() {"
+		String mapfn = "function() {"
 			+"for (var idx = 0; idx < this.orders.length; idx++) {"
 			+"var key = \"totalOfAllOrders\";"
 			+"var value = this.orders[idx].total;"
 			+"emit(key, value);} };";
 	
-		String reduceFunction = "function(keySKU, countObjVals) {"
+		String reducefn = "function(keySKU, countObjVals) {"
 			+"reducedVal = 0;"
 			+"for (var idx = 0; idx < countObjVals.length; idx++) {"
 					+"reducedVal += countObjVals[idx];}"
@@ -243,7 +243,7 @@ public class QueryMongoMapReduce
 		
 		System.out.println("\nTotal value of all orders:" );
 		MongoCollection<Document> col = db.getCollection(COLLECTION_NAME);
-		MapReduceIterable<Document> output = col.mapReduce(mapFunction, reduceFunction);
+		MapReduceIterable<Document> output = col.mapReduce(mapfn, reducefn);
 		return output.iterator();
 
 		
@@ -263,7 +263,7 @@ public class QueryMongoMapReduce
 				+"if (value == 0) {"
 				+"idx+=1;"
 				+"value = this.orders[idx].total; }"
-			+"emit(key, value);} };";
+			+"emit(key, value);} };"; //cant get states with no items 
 	
 		String reducefn = "function(keySKU, countObjVals) {"
 			+"reducedVal = 0;"
@@ -287,10 +287,33 @@ public class QueryMongoMapReduce
     	// TODO: Write a MongoDB MapReduce query that returns the average # of items per order by state with name > 'K'.  SELECT state, COUNT(orders.items)/COUNT(orders) WHERE name > 'K' GROUP BY state    	
     	// Note: For this MapReduce you will need to use a finalizeFunction like this: MapReduceIterable<Document> output = col.mapReduce(mapfn, reducefn).filter(queryobj).finalizeFunction(finalizefn);
     	// The filter may be applied as a function or as part of the map function.
-    	
-		MongoCollection<Document> col = db.getCollection(COLLECTION_NAME);
+    	String mapfn = "function() {"
+			+"for (var idx = 0; idx < this.orders.length; idx++) {"
+			+"var name = this.name;"
+			+"var key = this.state;"
+			+"var value = { count: 1, qty: this.orders[idx].items};"
+			+"if (name > 'K'){"
+				+"emit(key, value); }"
+			+"} };"; //cant get states with no items 
+	
+		String reducefn = "function(keySKU, countObjVals) {"
+			+"reducedVal = { count: 0, qty: 0 };"
+			+"for (var idx = 0; idx < countObjVals.length; idx++) {"
+					+"reducedVal.count += countObjVals[idx].count;"
+					+"reducedVal.qty += countObjVals[idx].qty; }"
+			+"return reducedVal;};";				
 		
-		return null;			
+		String finalizefn = "function (key, reducedVal) {"
+			+"reducedVal.avg = reducedVal.qty/reducedVal.count;"
+			+"return reducedVal.avg;};";
+		
+		System.out.println("\nAverage # of items per order by state with name > 'K':");
+		MongoCollection<Document> col = db.getCollection(COLLECTION_NAME);
+		MapReduceIterable<Document> output = col.mapReduce(mapfn, reducefn);
+		output.finalizeFunction(finalizefn);
+		return output.iterator();
+
+		//return null;			
     }
     
     /**
@@ -300,10 +323,32 @@ public class QueryMongoMapReduce
     {
     	// TODO: Write a MongoDB MapReduce query that find the order with the maximum # of items. SELECT MAX(orders.item) 
     	// Note: Output key should be "max".
-    	
+    	String mapfn = "function() {"
+			+"for (var idx = 0; idx < this.orders.length; idx++) {"
+			+"var key = \"max\";"
+			+"var max = this.orders[0].items;"
+			+"var index = -1;"
+			+"if (this.orders[idx].items > max) {" //cant get the correct max index 
+				+"max = this.orders[idx].items;" 
+				+"index = idx;"
+				+"var value = this.orders[index];"
+				+"emit(key, value); }"
+			+"} };";
+	
+		String reducefn = "function(keySKU, countObjVals) {"
+			+"reducedVal = { num: 0, items: 0, total: 0 };"
+			+"for (var idx = 0; idx < countObjVals.length; idx++) {"
+					+"reducedVal.num = countObjVals[idx].num;"
+					+"reducedVal.items = countObjVals[idx].items;"
+					+"reducedVal.total = countObjVals[idx].total; }"
+			+"return reducedVal;};";
+
+		System.out.println("\nMaximum # of items:");
 		MongoCollection<Document> col = db.getCollection(COLLECTION_NAME);
-		
-		return null;
+		MapReduceIterable<Document> output = col.mapReduce(mapfn, reducefn);
+		return output.iterator(); 
+
+		//return null;
     }
     
     /**
