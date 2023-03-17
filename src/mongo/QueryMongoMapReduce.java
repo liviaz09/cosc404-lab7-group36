@@ -276,37 +276,31 @@ public class QueryMongoMapReduce {
 	 * COUNT(orders.items)/COUNT(orders) WHERE name > 'K' GROUP BY state
 	 */
 	public MongoCursor<Document> query4() {
-		// TODO: Write a MongoDB MapReduce query that returns the average # of items per
-		// order by state with name > 'K'. SELECT state,
-		// COUNT(orders.items)/COUNT(orders) WHERE name > 'K' GROUP BY state
-		// Note: For this MapReduce you will need to use a finalizeFunction like this:
-		// MapReduceIterable<Document> output = col.mapReduce(mapfn,
-		// reducefn).filter(queryobj).finalizeFunction(finalizefn);
-		// The filter may be applied as a function or as part of the map function.
 		String mapfn = "function() {"
 				// +"var item; var order=0;"
 				+ "if (this.name > 'K') {"
-				+ "var item = 0; var orderLength = this.orders.length;"
-				+ "for (var idx = 0; idx < orderLength; idx++) {"
-				+ "item += this.orders[idx].items;"
+				+ "var itemCount = 0; var orderLength = this.orders.length; var orderCount=0;"
+				+ "for (var idx = 0; idx < orderLength; idx++) {"//iterate through table
+				//get item count which is >K and increase order count
+				+ "itemCount += this.orders[idx].items; orderCount++;"
 				+ "}"
-				+ "emit(this.state, {orderLength: orderLength, item: item});"
+				+ "emit(this.state, {itemCount: itemCount, orderCount: orderCount});"
 				+ "}"
-				+ "};"; // cant get states with no items
+				+ "};"; 
 
 		String reducefn = "function(keySKU, countObjVals) {"
-				+ "var reducedVal = {countO: 0, countI: 0};"
+				+ "var reducedVal = 0; var countOrder= 0; var countItem = 0;"
 				+ "for (var idx = 0; idx < countObjVals.length; idx++) {"
-				+ "reducedVal.countO += countObjVals[idx].orderLength;"
-				+ "reducedVal.countI += countObjVals[idx].item;"
-				+ "}"
-				+ "return reducedVal;"
+				+"countItem = countItem+ countObjVals[idx].countItem;  countOrder = countOrder + countObjVals[idx].countOrder;}"
+				+ "return {countItem: countItem, countOrder: countOrder};"
 				+ "};";
 
 		String finalizefn = "function (key, reducedVal) {"
-				+ "reducedVal.avg = reducedVal.countI / reducedVal.countO;"
-				+ "return reducedVal.avg;"
-				+ "};";
+			+"if (reducedVal.countOrder === 0){"
+			+"return 0.0;}"
+			+"else{"
+			+"return reducedVal.countItem/reducedVal.countOrder;"
+				+ "}};";
 
 		System.out.println("\nAverage # of items per order by state with name > 'K':");
 		MongoCollection<Document> col = db.getCollection(COLLECTION_NAME);
