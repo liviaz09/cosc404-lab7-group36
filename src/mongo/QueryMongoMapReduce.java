@@ -256,19 +256,16 @@ public class QueryMongoMapReduce
     public MongoCursor<Document> query3()
     {
     	// TODO: Write a MongoDB MapReduce query that returns the total value of all orders per state.  SELECT state, SUM(orders.total) GROUP BY state 	
-    	String mapfn = "function() {"
+    	String mapfn = "function() { var sum=0;"
 			+"for (var idx = 0; idx < this.orders.length; idx++) {"
-			+"var key = this.state;"
 			+"var value = this.orders[idx].total;"
-				+"if (value == 0) {"
-				+"idx+=1;"
-				+"value = this.orders[idx].total; }"
-			+"emit(key, value);} };"; //cant get states with no items 
+			+"sum = sum + value;"
+			+"}emit(this.state, sum); };"; //cant get states with no items 
 	
-		String reducefn = "function(keySKU, countObjVals) {"
-			+"reducedVal = 0;"
+		String reducefn = "function(keySK, countObjVals) {"
+			+"var  reducedVal =0;"
 			+"for (var idx = 0; idx < countObjVals.length; idx++) {"
-					+"reducedVal += countObjVals[idx];}"
+			+"reducedVal += countObjVals[idx];}"
 			+"return reducedVal;};";					
 		
 		System.out.println("\nTotal value of all orders per state:");
