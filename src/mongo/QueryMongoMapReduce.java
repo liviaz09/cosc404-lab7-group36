@@ -321,16 +321,18 @@ public class QueryMongoMapReduce
     	// TODO: Write a MongoDB MapReduce query that find the order with the maximum # of items. SELECT MAX(orders.item) 
     	// Note: Output key should be "max".
     	String mapfn = "function() {"
-			+"for (var idx = 0; idx < this.orders.length; idx++) {"
-			+"var key = \"max\";"
-			+"var max = this.orders[0].items;"
-			+"var index = -1;"
-			+"if (this.orders[idx].items > max) {" //cant get the correct max index 
-				+"max = this.orders[idx].items;" 
-				+"index = idx;"
-				+"var value = this.orders[index];"
-				+"emit(key, value); }"
-			+"} };";
+			+"for (var i = 0; i < this.orders.length; i++) {"
+				+"for (var j = i+1; j<this.orders.length; j++) {"
+					+"var key = \"max\";"
+					+"var index = -1;"
+					+"if (this.orders[i].items > this.orders[j].items) {" //cant get the correct max index 
+						+"temp = this.orders[i].items;" 
+						+"this.orders[i].items = this.orders[j].items;"
+						+"this.orders[j].items = temp;"
+						+"index = this.orders.length - 1;"
+						+"var value = this.orders[index];"
+						+"emit(key, value); }"
+			+"} }};";
 	
 		String reducefn = "function(keySKU, countObjVals) {"
 			+"reducedVal = { num: 0, items: 0, total: 0 };"
