@@ -224,15 +224,15 @@ public class QueryMongoMapReduce {
 		// Note: Output key must be called: "totalOfAllOrders".
 
 		String mapfn = "function() {"
-				+ "for (var idx = 0; idx < this.orders.length; idx++) {"
+				+ "for (var i = 0; i < this.orders.length; i++) {"
 				+ "var key = \"totalOfAllOrders\";"
-				+ "var value = this.orders[idx].total;"
+				+ "var value = this.orders[i].total;"
 				+ "emit(key, value);} };";
 
-		String reducefn = "function(keySKU, countObjVals) {"
+		String reducefn = "function(key, value) {"
 				+ "reducedVal = 0;"
-				+ "for (var idx = 0; idx < countObjVals.length; idx++) {"
-				+ "reducedVal += countObjVals[idx];}"
+				+ "for (var i = 0; i < value.length; i++) {"
+				+ "reducedVal += value[i];}"
 				+ "return reducedVal;};";
 
 		System.out.println("\nTotal value of all orders:");
@@ -251,15 +251,15 @@ public class QueryMongoMapReduce {
 		// TODO: Write a MongoDB MapReduce query that returns the total value of all
 		// orders per state. SELECT state, SUM(orders.total) GROUP BY state
 		String mapfn = "function() { var sum=0;"
-				+ "for (var idx = 0; idx < this.orders.length; idx++) {"
-				+ "var value = this.orders[idx].total;"
+				+ "for (var i = 0; i < this.orders.length; i++) {"
+				+ "var value = this.orders[i].total;"
 				+ "sum = sum + value;"
-				+ "}emit(this.state, sum); };"; // cant get states with no items
+				+ "}emit(this.state, sum); };"; 
 
-		String reducefn = "function(keySK, countObjVals) {"
+		String reducefn = "function(key, value) {"
 				+ "var  reducedVal =0;"
-				+ "for (var idx = 0; idx < countObjVals.length; idx++) {"
-				+ "reducedVal += countObjVals[idx];}"
+				+ "for (var i = 0; i < value.length; i++) {"
+				+ "reducedVal += value[i];}"
 				+ "return reducedVal;};";
 
 		System.out.println("\nTotal value of all orders per state:");
@@ -276,40 +276,32 @@ public class QueryMongoMapReduce {
 	 * COUNT(orders.items)/COUNT(orders) WHERE name > 'K' GROUP BY state
 	 */
 	public MongoCursor<Document> query4() {
-		String mapfn = "function() {"
-				// +"var item; var order=0;"
-				+ "if (this.name > 'K') {"
-				+ "var itemCount = 0; var orderLength = this.orders.length; var orderCount=0;"
-				+ "for (var idx = 0; idx < orderLength; idx++) {"//iterate through table
-				//get item count which is >K and increase order count
-				+ "itemCount += this.orders[idx].items; orderCount++;"
-				+ "}"
-				+ "emit(this.state, {itemCount: itemCount, orderCount: orderCount});"
-				+ "}"
-				+ "};"; 
-
-		String reducefn = "function(keySKU, countObjVals) {"
-				+ "var reducedVal = 0; var countOrder= 0; var countItem = 0;"
-				+ "for (var idx = 0; idx < countObjVals.length; idx++) {"
-				+"countItem = countItem+ countObjVals[idx].countItem;  countOrder = countOrder + countObjVals[idx].countOrder;}"
-				+ "return {countItem: countItem, countOrder: countOrder};"
-				+ "};";
-
-		String finalizefn = "function (key, reducedVal) {"
-			+"if (reducedVal.countOrder === 0){"
-			+"return 0.0;}"
-			+"else{"
-			+"return reducedVal.countItem/reducedVal.countOrder;"
-				+ "}};";
-
-		System.out.println("\nAverage # of items per order by state with name > 'K':");
 		MongoCollection<Document> col = db.getCollection(COLLECTION_NAME);
-		MapReduceIterable<Document> output = col.mapReduce(mapfn, reducefn);
-		output.finalizeFunction(finalizefn);
+		String mapfn = "function() { "
+			+ "var qty = 0; "
+			+ "var count = 0; "
+			+ "var name = this.name;"
+			+ "if (name > 'K') { "
+			+ "for (var i = 0; i < this.orders.length; i++) { "
+			+ "qty += this.orders[i].items; "
+			+ "count++; }"
+			+ "emit(this.state, {qty: qty, count: count}); }}";
+		String reducefn = "function(key, value) { "
+			+ "var reducedVal = {qty: 0, count: 0}; "
+			+ "var count = 0; "
+			+ "for (var i = 0; i < value.length; i++) { "
+			+ "reducedVal.qty += value[i].qty; "
+			+ "reducedVal.count += value[i].count; }"
+			+ "return reducedVal; }";
+		String finalizefn = "function(key, value) { "
+			+ "return value.count === 0 ? 0.0 : value.qty / value.count; }";
+		MapReduceIterable<Document> output = col.mapReduce(mapfn, reducefn).finalizeFunction(finalizefn);
 		return output.iterator();
 	}
 
-	// return null;
+		// return null;
+
+
 
 	/**
      * Performs a MongoDB MapReduce query that find the order with the maximum # of items. SELECT MAX(orders.item) 
@@ -319,26 +311,26 @@ public class QueryMongoMapReduce {
     	// TODO: Write a MongoDB MapReduce query that find the order with the maximum # of items. SELECT MAX(orders.item) 
     	// Note: Output key should be "max".
     	String mapfn = "function() {"
+		
 			+"for (var i = 0; i < this.orders.length; i++) {"
-				+"for (var j = i+1; j<this.orders.length; j++) {"
-					+"var key = \"max\";"
-					+"var index = -1;"
-					+"if (this.orders[i].items > this.orders[j].items) {" //cant get the correct max index 
-						+"temp = this.orders[i].items;" 
-						+"this.orders[i].items = this.orders[j].items;"
-						+"this.orders[j].items = temp;"
-						+"index = this.orders.length - 1;"
-						+"var value = this.orders[index];"
-						+"emit(key, value); }"
-			+"} }};";
+			+"var key = \"max\";"
+			+"var max = this.orders[0].items;"
+			+"var num = 0;"
+			+"var items = 0;"
+			+"var total = 0;"
+			+"if (this.orders[i].items > max) {" //cant get the correct max index 
+				+"max = this.orders[i].items;" 
+				+"items += max;"
+				+"num += this.orders[i].num;"
+				+"total += this.orders[i].total; }"
+			+"emit(key, {num, items, total}); }};";
 
-
-		String reducefn = "function(keySKU, countObjVals) {"
+		String reducefn = "function(key, value) {"
 				+ "reducedVal = { num: 0, items: 0, total: 0 };"
-				+ "for (var idx = 0; idx < countObjVals.length; idx++) {"
-				+ "reducedVal.num = countObjVals[idx].num;"
-				+ "reducedVal.items = countObjVals[idx].items;"
-				+ "reducedVal.total = countObjVals[idx].total; }"
+				+ "for (var i = 0; i < value.length; i++) {"
+				+ "reducedVal.num += value[i].num;"
+				+ "reducedVal.items += value[i].items;"
+				+ "reducedVal.total += value[i].total; }"
 				+ "return reducedVal;};";
 
 		System.out.println("\nMaximum # of items:");
